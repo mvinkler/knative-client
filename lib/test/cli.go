@@ -110,6 +110,28 @@ func RunKubectl(namespace string, args ...string) (string, error) {
 	return stdout, nil
 }
 
+// Oc type
+type Oc struct {
+	namespace string
+}
+
+// Run the 'oc' CLI with args
+func (o Oc) Run(args ...string) (string, error) {
+	return RunOc(o.namespace, args...)
+}
+
+// RunOc runs "oc" in a given namespace
+func RunOc(namespace string, args ...string) (string, error) {
+	if namespace != "" {
+		args = append(args, "--namespace", namespace)
+	}
+	stdout, stderr, err := runCli("oc", args)
+	if err != nil {
+		return stdout, fmt.Errorf("stderr: %s: %w", stderr, err)
+	}
+	return stdout, nil
+}
+
 // Private
 
 func runCli(cli string, args []string) (string, string, error) {

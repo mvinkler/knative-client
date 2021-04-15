@@ -121,10 +121,35 @@ func GetNextServiceName(base string) string {
 
 // CreateNamespace creates and tests a namespace creation invoking kubectl
 func CreateNamespace(namespace string) error {
+
+	var (
+		errOc     error
+		outOc     string
+	)
+
 	expectedOutputRegexp := fmt.Sprintf("namespace?.+%s.+created", namespace)
+	expectedOutputProjectRegexp := fmt.Sprintf(".+project?.+%s.+on server", namespace)
 	out, err := createNamespaceWithRetry(namespace, MaxRetries)
 	if err != nil {
-		return fmt.Errorf("could not create namespace %s: %w", namespace, err)
+		fmt.Println("Failed to create Namespace: %s; %v", namespace, err)
+		fmt.Println("Using oc new-project instead")
+
+		outOc, errOc = Oc{}.Run("new-project", namespace)
+		if errOc == nil {
+			fmt.Println("stdout: ", outOc)
+		} else {
+			return fmt.Errorf("could not create new project %s: %w", namespace, errOc)
+		}
+		// check that last output indeed show created namespace
+		matched, errOc := matchRegexp(expectedOutputProjectRegexp, outOc)
+		if errOc != nil {
+			return errOc
+		}
+		if !matched {
+			return fmt.Errorf("Expected output incorrect, expecting to include:\n%s\n Instead found:\n%s\n", expectedOutputProjectRegexp, outOc)
+		}
+		return nil
+
 	}
 
 	// check that last output indeed show created namespace
@@ -140,13 +165,28 @@ func CreateNamespace(namespace string) error {
 
 // DeleteNamespace deletes and tests a namespace deletion invoking kubectl
 func DeleteNamespace(namespace string) error {
+
+	var (
+		errOc     error
+		outOc     string
+	)
+
 	kubectl := Kubectl{namespace}
 	out, err := kubectl.Run("delete", "namespace", namespace)
 	if err != nil {
-		return fmt.Errorf("Cannot delete namespace %s: %w", namespace, err)
+		fmt.Println("Failed to delete Namespace: %s; %v", namespace, err)
+		fmt.Println("Using oc delete project instead")
+
+		outOc, errOc = Oc{}.Run("delete", "project", namespace)
+		if errOc == nil {
+			fmt.Println("stdout: ", outOc)
+		} else {
+			return fmt.Errorf("Cannot delete project %s: %w", namespace, errOc)
+		}
+		out = outOc
 	}
 
-	expectedOutputRegexp := fmt.Sprintf("namespace?.+%s.+deleted", namespace)
+	expectedOutputRegexp := fmt.Sprintf(".+%s.+deleted", namespace)
 	matched, err := matchRegexp(expectedOutputRegexp, out)
 	if err != nil {
 		return err
